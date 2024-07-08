@@ -21,8 +21,4 @@ public class Barbeiro {
     public boolean isCortando() {
         return cortando;
     }
-
-    public void setCortando(boolean cortando) {
-        this.cortando = cortando;
-    }
 }

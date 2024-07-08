@@ -8,7 +8,7 @@ public class Main {
             String nomeCliente = "Cliente " + i;
             new Cliente(barbearia, nomeCliente).start();
             try {
-                Thread.sleep(1000);
+                Thread.sleep(200);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
