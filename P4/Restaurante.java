@@ -2,70 +2,54 @@ package P4;
 
 import java.util.Random;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 class Restaurante {
     private final int quantidadeLugares;
-    private final Semaphore semMesa;
-    private final Semaphore semFila = new Semaphore(0);
-    private final Semaphore mutex = new Semaphore(1);
-    private int clientesNaFila = 0;
+    private final Semaphore semaforoMesa;
+    private final Lock lock = new ReentrantLock();
+    private final Condition restauranteCheio = lock.newCondition();
     private int clientesJantando = 0;
 
     public Restaurante(int quantidadeLugares) {
         this.quantidadeLugares = quantidadeLugares;
-        this.semMesa = new Semaphore(quantidadeLugares);
+        this.semaforoMesa = new Semaphore(quantidadeLugares);
     }
 
     public void entrarRestaurante(String nomeCliente) throws InterruptedException {
-        mutex.acquire();
-        if (clientesJantando == quantidadeLugares) {
-            mutex.release();
-            aguardarClientesSairem();
-        } else {
-            clientesNaFila++;
-            if (clientesNaFila > 1) {
-                mutex.release();
-                semFila.acquire();
-            } else {
-                mutex.release();
+        System.out.println(nomeCliente + " entrou na fila do restaurante");
+
+        lock.lock();
+        try {
+            while (clientesJantando == quantidadeLugares) { // todas as mesas ocupadas aguarda um sinal
+                restauranteCheio.await();
             }
 
-            semMesa.acquire();
-
-            mutex.acquire();
-            clientesNaFila--;
+            semaforoMesa.acquire();
             clientesJantando++;
-            if (clientesNaFila > 0) {
-                semFila.release();
-            }
-            mutex.release();
+            System.out.println(nomeCliente + " entrou para jantar.");
+            System.out.println(clientesJantando + " clientes estão jantando.");
+        } finally {
+            lock.unlock();
+        }
 
-            System.out.println(nomeCliente + " está jantando.");
-            mutex.acquire();
-            int tempoJantar = new Random().nextInt(5000) + 1000; // 1 a 6 seg
-            mutex.release();
-            Thread.sleep(tempoJantar);
+        int tempoJantar = new Random().nextInt(5000) + 1000; // 1 a 6 segundos
+        Thread.sleep(tempoJantar);
 
-            mutex.acquire();
+        lock.lock();
+        try {
             clientesJantando--;
-            if (clientesJantando == 0 && clientesNaFila > 0) {
-                semFila.release();
-            }
-            mutex.release();
-
-            semMesa.release();
+            semaforoMesa.release();
             System.out.println(nomeCliente + " terminou de jantar.");
-        }
-    }
 
-    private void aguardarClientesSairem() throws InterruptedException {
-        mutex.acquire();
-        while (clientesJantando > 0) {
-            mutex.release();
-            Thread.sleep(500);
-            mutex.acquire();
+            if (clientesJantando == 0) {
+                restauranteCheio.signalAll(); // libera quando não tem mais clientes jantando
+                System.out.println("Todas as mesas estão livres.");
+            }
+        } finally {
+            lock.unlock();
         }
-        semMesa.acquire(quantidadeLugares);
-        mutex.release();
     }
 }
